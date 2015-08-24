@@ -64,28 +64,7 @@ public class GameManager : MonoBehaviour
         // Pause and unpause the game
         if (Input.GetButtonDown("Pause Menu"))
         {
-            if (paused)
-            {
-                hidePauseMenu();
-            }
-            else
-            {
-                showPauseMenu();
-            }
-
-            // Activate and deactivate game objects
-            Object[] objects = FindObjectsOfType(typeof(GameObject));
-            foreach (GameObject gameObject in objects)
-            {
-                if (paused)
-                {
-                    gameObject.SendMessage("OnPauseGame", SendMessageOptions.DontRequireReceiver);
-                }
-                else
-                {
-                    gameObject.SendMessage("OnResumeGame", SendMessageOptions.DontRequireReceiver);
-                }
-            }
+            Application.Quit();
         }
 
 #if UNITY_WEBPLAYER || UNITY_WEBGL

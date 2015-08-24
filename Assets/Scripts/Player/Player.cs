@@ -3,11 +3,12 @@ using System.Collections;
 
 public class Player : MonoBehaviour
 {
-    #region COMPONENTS
+    #region PARAMETERS
     public float timeToKill;
     #endregion
 
     private Monster monster;
+    private Target[] targets;
     private Vector3 startPosition;
 
     #region COMPONENTS
@@ -18,13 +19,15 @@ public class Player : MonoBehaviour
     #region VARIABLES
     private Vector3 nextDestination;
     public bool isVisible { get; private set; }
-    private float attackTimer;
+    private float attackTimer, loseTimer;
+    private bool attacking;
     #endregion
 
 
     void Start ()
     {
         monster = GameObject.FindObjectOfType<Monster>();
+        targets = GameObject.FindObjectsOfType<Target>();
         startPosition = GameObject.Find("PlayerStartPosition").transform.position;
 
         m_Renderer = GetComponent<Renderer>();
@@ -36,17 +39,22 @@ public class Player : MonoBehaviour
     void reset ()
     {
         attackTimer = 0f;
-        findNewDestination();
+        loseTimer = 0f;
+        attacking = false;
+        m_Agent.Warp(new Vector3(startPosition.x, transform.position.y, startPosition.z));
+        findNextDestination();
     }
 
     void Update()
     {
-        checkVisibility();
+        //checkVisibility();
 
-        if (m_Agent.remainingDistance <= 0f)
+        if (m_Agent.remainingDistance <= 0.2f)
         {
-            findNewDestination();
+            findNextDestination();
         }
+
+        checkVictory();
     }
 
     void FixedUpdate()
@@ -54,24 +62,55 @@ public class Player : MonoBehaviour
         checkAttack();
     }
 
-    void findNewDestination ()
+    public void findNextDestination ()
     {
-        m_Agent.destination = new Vector3(Random.Range(-1f, 1f) * GameConstants.width, transform.position.y, Random.Range(-1f, 1f) * GameConstants.depth);
+        NavMeshPath path = new NavMeshPath();
+        int indexTargetChosen = -1;
+        bool found = false;
+        int count = 0;
+        if (getNumberOfTargetsOff() > 0)
+        {
+            while (!found && count < 99)
+            {
+                indexTargetChosen = Random.Range(0, targets.Length);
+                if (!targets[indexTargetChosen].isOn)
+                {
+                    m_Agent.CalculatePath(targets[indexTargetChosen].transform.position, path);
+                    if (path.status == NavMeshPathStatus.PathComplete)
+                    {
+                        found = true;
+                    }
+                }
+                count++;
+            }
+        }
+        
+        if (found)
+        {
+            Vector3 destination = targets[indexTargetChosen].transform.position;
+            m_Agent.destination = new Vector3(destination.x, transform.position.y, destination.z);
+        }
     }
 
     void checkAttack ()
     {
         bool resume = false;
+        Vector3 position = new Vector3(transform.position.x, transform.position.y - 0.5f, transform.position.z);
         RaycastHit hitInfo;
-        if (Physics.SphereCast(new Ray(transform.position, transform.forward), 4f, out hitInfo, Mathf.Infinity))
+        if (Physics.Raycast(position, transform.forward, out hitInfo, Mathf.Infinity) 
+            || Physics.Raycast(position, Quaternion.Euler(0f, 1f, 0f) * transform.forward, out hitInfo, Mathf.Infinity) || Physics.Raycast(transform.position, Quaternion.Euler(0f, -1f, 0f) * transform.forward, out hitInfo, Mathf.Infinity)
+            || Physics.Raycast(position, Quaternion.Euler(0f, 2f, 0f) * transform.forward, out hitInfo, Mathf.Infinity) || Physics.Raycast(transform.position, Quaternion.Euler(0f, -2f, 0f) * transform.forward, out hitInfo, Mathf.Infinity)
+            || Physics.Raycast(position, Quaternion.Euler(0f, 3f, 0f) * transform.forward, out hitInfo, Mathf.Infinity) || Physics.Raycast(transform.position, Quaternion.Euler(0f, -3f, 0f) * transform.forward, out hitInfo, Mathf.Infinity)
+            || Physics.Raycast(position, Quaternion.Euler(0f, 4f, 0f) * transform.forward, out hitInfo, Mathf.Infinity) || Physics.Raycast(transform.position, Quaternion.Euler(0f, -4f, 0f) * transform.forward, out hitInfo, Mathf.Infinity))
         {
             if (hitInfo.collider.CompareTag("Monster"))
             {
                 if (attackTimer < timeToKill)
                 {
-                    monster.hit();
+                    monster.hit(attackTimer, timeToKill);
                     attackTimer += Time.deltaTime;
                     m_Agent.Stop();
+                    transform.LookAt(monster.transform);
                 }
                 else
                 {
@@ -93,6 +132,7 @@ public class Player : MonoBehaviour
         {
             attackTimer = 0f;
             m_Agent.Resume();
+            monster.notHit();
         }
     }
 
@@ -109,9 +149,62 @@ public class Player : MonoBehaviour
         }
     }
 
+    void checkVictory ()
+    {
+        bool allOn = true;
+        for (int i = 0; i < targets.Length; i++)
+        {
+            if (!targets[i].isOn)
+            {
+                allOn = false;
+            }
+        }
+
+        if (allOn)
+        {
+            loseTimer += Time.deltaTime;
+            monster.lose(loseTimer);
+        }
+    }
+
+    public int getNumberOfTargetsOn ()
+    {
+        int number = 0;
+        for (int i = 0; i < targets.Length; i++)
+        {
+            if (targets[i].isOn)
+            {
+                number++;
+            }
+        }
+        return number;
+    }
+
+    public int getNumberOfTargetsOff()
+    {
+        int number = 0;
+        for (int i = 0; i < targets.Length; i++)
+        {
+            if (!targets[i].isOn)
+            {
+                number++;
+            }
+        }
+        return number;
+    }
+
+    public int getNumberOfTargets ()
+    {
+        return targets.Length;
+    }
+
+    public void activateSwitch ()
+    {
+
+    }
+
     public void kill ()
     {
-        transform.position = startPosition;
         reset();
     }
 }
